@@ -1,11 +1,22 @@
 package com.example.projecteuclid.domain
 
 import java.math.BigDecimal
+import javax.validation.constraints.DecimalMax
+import javax.validation.constraints.DecimalMin
+import javax.validation.constraints.NotNull
 
 class GeoPosition(id: Long?, latitude: BigDecimal, longitude: BigDecimal) {
 
     val id = id;
+
+    @NotNull
+    @DecimalMin("-90")
+    @DecimalMax("90")
     val latitude = latitude;
+
+    @NotNull
+    @DecimalMin("-180")
+    @DecimalMax("180")
     val longitude = longitude;
 
     constructor(latitude: BigDecimal, longitude: BigDecimal) : this(null, latitude, longitude)
