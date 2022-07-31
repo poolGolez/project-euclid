@@ -1,5 +1,6 @@
 package com.example.projecteuclid.domain
 
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 
@@ -7,31 +8,40 @@ import org.springframework.stereotype.Component
 @Qualifier("k-d tree search")
 class KdTreeSearchStrategy : GeoPositionSearchStrategy {
 
-    override fun search(targetGeoPosition: GeoPosition): GeoPosition? {
+    @Autowired
+    lateinit var treeBuilder: GeoPositionTreeBuilder
+
+    override fun search(fixedGeoPosition: GeoPosition): GeoPosition? {
         val tree = generateKdTree()
         if (tree.root == null) {
             return null
         }
 
-        val maxDistanceSquared = Math.pow(2 * 90.0, 2.0) + Math.pow(2 * 180.0, 2.0)
-        val initialSearchResult = SearchResult(tree.root!!, maxDistanceSquared)
-        var searchResult = searchTreeNode(targetGeoPosition, tree.root!!, initialSearchResult, 1)
+        val initialSearchResult = initSearchResult(tree)
+        var searchResult = searchTreeNode(fixedGeoPosition, tree.root!!, initialSearchResult)
 
         // backtrack
-        searchResult =
-            backTrackSearch(targetGeoPosition, searchResult.node.parent, searchResult, searchResult.level - 1)
-
+        if (searchResult.distanceSquared != 0.0) {
+            searchResult =
+                backTrackSearch(fixedGeoPosition, searchResult.leafNode!!.parent, searchResult)
+        }
         return searchResult.geoPosition
+    }
+
+    private fun initSearchResult(tree: GeoPositionTree): SearchResult {
+        val extremeLowerLeftValue = GeoPosition(-90.0, -180.0)
+        val extremeUpperRightValue = GeoPosition(90.0, 180.0)
+        val maxDistanceSquared = extremeLowerLeftValue.distanceSquaredFrom(extremeUpperRightValue)
+
+        return SearchResult(tree.root!!, maxDistanceSquared)
     }
 
     private fun searchTreeNode(
         targetGeoPosition: GeoPosition,
         node: GeoPositionTree.TreeNode,
-        searchResult: SearchResult,
-        level: Int
+        searchResult: SearchResult
     ): SearchResult {
-
-        val newSearchResult = updateSearchResult(searchResult, targetGeoPosition, node, level)
+        val newSearchResult = updateSearchResult(searchResult, targetGeoPosition, node)
 
         if (node.position.latitude == targetGeoPosition.latitude &&
             node.position.longitude == targetGeoPosition.longitude
@@ -39,22 +49,21 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
             return newSearchResult
         }
 
-        val comparator = GeoPositionTree.getComparator(level)
-        if (comparator.invoke(targetGeoPosition, node.position) < 0) {
+        if (node.isLeaf) {
+            return newSearchResult.apply { leafNode = node }
+        }
+
+        return if (node.compare(targetGeoPosition) > 0) {
             if (node.left != null) {
-                return searchTreeNode(targetGeoPosition, node.left!!, newSearchResult, level + 1)
-            } else if (node.right != null) {
-                return searchTreeNode(targetGeoPosition, node.right!!, newSearchResult, level + 1)
+                searchTreeNode(targetGeoPosition, node.left!!, newSearchResult)
             } else {
-                return newSearchResult
+                searchTreeNode(targetGeoPosition, node.right!!, newSearchResult)
             }
         } else {
             if (node.right != null) {
-                return searchTreeNode(targetGeoPosition, node.right!!, newSearchResult, level + 1)
-            } else if (node.left != null) {
-                return searchTreeNode(targetGeoPosition, node.left!!, newSearchResult, level + 1)
+                searchTreeNode(targetGeoPosition, node.right!!, newSearchResult)
             } else {
-                return newSearchResult
+                searchTreeNode(targetGeoPosition, node.left!!, newSearchResult)
             }
         }
     }
@@ -62,74 +71,67 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
     private fun backTrackSearch(
         targetGeoPosition: GeoPosition,
         node: GeoPositionTree.TreeNode?,
-        searchResult: SearchResult,
-        level: Int
+        searchResult: SearchResult
     ): SearchResult {
-        if (level == 0) {
+        if (node == null) {
             return SearchResult(searchResult.node, searchResult.distanceSquared)
         }
+
+        val hyperPlaneIntersectsHyperSphere =
+            (node.calculateHyperPlaneDistance(targetGeoPosition) < searchResult.distanceSquared)
+        if (!hyperPlaneIntersectsHyperSphere) {
+            return backTrackSearch(targetGeoPosition, node.parent, searchResult)
+        }
+
         var newSearchResult = searchResult
-        val hyperPlaneDistanceMeasure = getHyperPlaneDistanceMeasure(level)
-        val hyperPlaneDistanceSquared = hyperPlaneDistanceMeasure.invoke(targetGeoPosition, node!!.position)
-        if (hyperPlaneDistanceSquared < searchResult.distanceSquared) {
-            // explore subtree
-            val comparator = GeoPositionTree.getComparator(level)
-            if (comparator.invoke(targetGeoPosition, node.position) < 0) {
-                // explore right subtree
-                if (node.right != null) {
-                    newSearchResult = searchTreeNode(targetGeoPosition, node.right!!, searchResult, level + 1)
-                } else {
-                    // nothing to explore!
-                }
-            } else {
-                if (node.left != null) {
-                    newSearchResult = searchTreeNode(targetGeoPosition, node.left!!, searchResult, level + 1)
-                }
+        // search for closest point on opposite side of hyperplane if it exists
+        if (node.compare(targetGeoPosition) > 0) {
+            if (node.right != null) {
+                newSearchResult = searchTreeNode(targetGeoPosition, node.right!!, searchResult)
+            }
+        } else {
+            if (node.left != null) {
+                newSearchResult = searchTreeNode(targetGeoPosition, node.left!!, searchResult)
             }
         }
 
-        return backTrackSearch(targetGeoPosition, node.parent, newSearchResult, level - 1)
-    }
-
-    private fun getHyperPlaneDistanceMeasure(height: Int): (GeoPosition, GeoPosition) -> Double {
-        val comparator: (GeoPosition, GeoPosition) -> Double = GeoPositionTree.getComparator(height)
-        return { a: GeoPosition, b: GeoPosition -> Math.pow(comparator.invoke(a, b), 2.0) }
+        return backTrackSearch(targetGeoPosition, node.parent, newSearchResult)
     }
 
     private fun updateSearchResult(
         searchResult: SearchResult,
         targetGeoPosition: GeoPosition,
-        node: GeoPositionTree.TreeNode,
-        height: Int
+        node: GeoPositionTree.TreeNode
     ): SearchResult {
         val bestDistance = searchResult.distanceSquared
         val nodeDistance = node.position.distanceSquaredFrom(targetGeoPosition)
         return if (nodeDistance < bestDistance)
-            SearchResult(node, nodeDistance, height)
+            SearchResult(node, nodeDistance, searchResult.leafNode)
         else
-            SearchResult(searchResult.node, searchResult.distanceSquared, searchResult.level)
+            SearchResult(searchResult.node, searchResult.distanceSquared, searchResult.leafNode)
     }
 
     private fun generateKdTree(): GeoPositionTree {
-        val tree = GeoPositionTree()
-        tree.insert(GeoPosition(8.0, 1.0))
+        val points = listOf(
+            GeoPosition(8.0, 1.0),
+            GeoPosition(0.0, 8.0),
+            GeoPosition(16.0, 8.0),
+            GeoPosition(4.0, 16.0),
+            GeoPosition(12.0, 4.0),
+            GeoPosition(5.0, 12.0),
+            GeoPosition(7.0, 9.0)
+        )
 
-        tree.insert(GeoPosition(0.0, 8.0))
-        tree.insert(GeoPosition(16.0, 8.0))
-
-        tree.insert(GeoPosition(4.0, 16.0))
-        tree.insert(GeoPosition(12.0, 4.0))
-
-        tree.insert(GeoPosition(5.0, 12.0))
-
-        tree.insert(GeoPosition(7.0, 9.0))
-
-        return tree
+        return treeBuilder.build(points)
     }
 
-    data class SearchResult(val node: GeoPositionTree.TreeNode, val distanceSquared: Double, val level: Int) {
+    data class SearchResult(
+        val node: GeoPositionTree.TreeNode,
+        val distanceSquared: Double,
+        var leafNode: GeoPositionTree.TreeNode?
+    ) {
 
-        constructor(node: GeoPositionTree.TreeNode, distanceSquared: Double) : this(node, distanceSquared, 0)
+        constructor(node: GeoPositionTree.TreeNode, distanceSquared: Double) : this(node, distanceSquared, null)
 
         val geoPosition: GeoPosition
             get() = node.position

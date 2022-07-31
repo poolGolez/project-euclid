@@ -1,8 +1,10 @@
 package com.example.projecteuclid.domain
 
+import kotlin.math.pow
+
 class GeoPositionTree(var root: TreeNode?) {
 
-    constructor(): this(null)
+    constructor() : this(null)
 
     fun insert(position: GeoPosition) {
         if (root == null) {
@@ -14,7 +16,7 @@ class GeoPositionTree(var root: TreeNode?) {
     }
 
     private fun insert(position: GeoPosition, parentNode: TreeNode) {
-        if (parentNode.comparator.invoke(position, parentNode.position) < 0) {
+        if (parentNode.compare(position) > 0) {
             if (parentNode.left == null) {
                 parentNode.left = TreeNode(position, parentNode)
             } else {
@@ -35,6 +37,7 @@ class GeoPositionTree(var root: TreeNode?) {
             left?.let { left!!.parent = this }
             right?.let { right!!.parent = this }
         }
+
         constructor(position: GeoPosition) : this(position, null)
 
         constructor(position: GeoPosition, left: TreeNode?, right: TreeNode?) : this(position, left, right, null)
@@ -44,35 +47,25 @@ class GeoPositionTree(var root: TreeNode?) {
         val isLeaf: Boolean
             get() = (left == null && right == null)
 
-        val level: Int
-            get() { return if(parent == null) 1 else parent!!.level + 1}
-
-        val comparator: (GeoPosition, GeoPosition) -> Double
+        private val level: Int
             get() {
-                if (level % 2 == 1) {
-                    // TODO: Reuse GeoPositionComparator
-                    return { a: GeoPosition, b: GeoPosition -> a.latitude - b.latitude }
-                } else {
-                    return { a: GeoPosition, b: GeoPosition -> a.longitude - b.longitude }
-                }
+                return if (parent == null) 1 else parent!!.level + 1
             }
+
+        fun compare(other: GeoPosition): Double {
+            return if (level % 2 == 1) {
+                position.compareLatitude(other)
+            } else {
+                position.compareLongitude(other)
+            }
+        }
+
+        fun calculateHyperPlaneDistance(other : GeoPosition): Double {
+            return compare(other).pow(2.0)
+        }
 
         override fun toString(): String {
-            return "(${position.latitude}, ${position.longitude})"
-        }
-    }
-
-    companion object {
-        @Deprecated("Use TreeNode.comparator")
-        fun getComparator(level: Int): (GeoPosition, GeoPosition) -> Double {
-            val comparator: (GeoPosition, GeoPosition) -> Double
-            if (level % 2 == 1) {
-                // TODO: Reuse GeoPositionComparator
-                comparator = { a: GeoPosition, b: GeoPosition -> a.latitude - b.latitude }
-            } else {
-                comparator = { a: GeoPosition, b: GeoPosition -> a.longitude - b.longitude }
-            }
-            return comparator
+            return "($position) level ${level}"
         }
     }
 }
