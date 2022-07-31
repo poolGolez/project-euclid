@@ -38,7 +38,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         }
 
         val initialSearchResult = initSearchResult(tree)
-        var searchResult = searchTreeNode(fixedGeoPosition, tree.root!!, initialSearchResult)
+        var searchResult = searchClosestLeafNode(fixedGeoPosition, tree.root!!, initialSearchResult)
 
         // backtrack
         if (searchResult.distanceSquared.compareTo(BigDecimal.ZERO) != 0) {
@@ -56,7 +56,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         return SearchResult(tree.root!!, maxDistanceSquared)
     }
 
-    private fun searchTreeNode(
+    private fun searchClosestLeafNode(
         targetGeoPosition: GeoPosition,
         node: GeoPositionTree.TreeNode,
         searchResult: SearchResult
@@ -74,15 +74,15 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
 
         return if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
             if (node.left != null) {
-                searchTreeNode(targetGeoPosition, node.left!!, newSearchResult)
+                searchClosestLeafNode(targetGeoPosition, node.left!!, newSearchResult)
             } else {
-                searchTreeNode(targetGeoPosition, node.right!!, newSearchResult)
+                searchClosestLeafNode(targetGeoPosition, node.right!!, newSearchResult)
             }
         } else {
             if (node.right != null) {
-                searchTreeNode(targetGeoPosition, node.right!!, newSearchResult)
+                searchClosestLeafNode(targetGeoPosition, node.right!!, newSearchResult)
             } else {
-                searchTreeNode(targetGeoPosition, node.left!!, newSearchResult)
+                searchClosestLeafNode(targetGeoPosition, node.left!!, newSearchResult)
             }
         }
     }
@@ -106,11 +106,11 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         // search for closest point on opposite side of hyperplane if it exists
         if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
             if (node.right != null) {
-                newSearchResult = searchTreeNode(targetGeoPosition, node.right!!, searchResult)
+                newSearchResult = searchClosestLeafNode(targetGeoPosition, node.right!!, searchResult)
             }
         } else {
             if (node.left != null) {
-                newSearchResult = searchTreeNode(targetGeoPosition, node.left!!, searchResult)
+                newSearchResult = searchClosestLeafNode(targetGeoPosition, node.left!!, searchResult)
             }
         }
 

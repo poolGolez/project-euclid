@@ -21,7 +21,12 @@ class GeoPosition(id: Long?, latitude: BigDecimal, longitude: BigDecimal) {
 
     constructor(latitude: BigDecimal, longitude: BigDecimal) : this(null, latitude, longitude)
 
-    constructor(latitude: Double, longitude: Double) : this(null, latitude.toBigDecimal(), longitude.toBigDecimal())
+    constructor(latitude: Double, longitude: Double) : this(null, latitude, longitude)
+    constructor(id: Long?, latitude: Double, longitude: Double) : this(
+        id,
+        latitude.toBigDecimal(),
+        longitude.toBigDecimal()
+    )
 
     fun distanceSquaredFrom(position: GeoPosition): BigDecimal {
         return (latitude - position.latitude).pow(2) +
