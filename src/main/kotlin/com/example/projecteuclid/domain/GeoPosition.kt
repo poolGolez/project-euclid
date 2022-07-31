@@ -12,4 +12,8 @@ class GeoPosition(id: Long?, latitude: Double, longitude: Double) {
         return Math.pow(latitude - position.latitude, 2.0) +
                 Math.pow(longitude - position.longitude, 2.0)
     }
+
+    override fun toString(): String {
+        return "($latitude, $longitude)"
+    }
 }
