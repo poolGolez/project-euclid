@@ -14,13 +14,17 @@ class BruteForceSearchStrategy : GeoPositionSearchStrategy {
 
     override fun search(fixedGeoPosition: GeoPosition): GeoPosition? {
         val positions = repository.findAll()
-        var bestDistanceSquared = Math.pow(180.0 - -180.0, 2.0) + Math.pow(90.0 - -90.0, 2.0)
+
+        val extremeLowerLeftValue = GeoPosition(-90.0, -180.0)
+        val extremeUpperRightValue = GeoPosition(90.0, 180.0)
+        var maxDistanceSquared = extremeLowerLeftValue.distanceSquaredFrom(extremeUpperRightValue)
+
         var closestGeoPosition: GeoPosition? = null
 
         for (position in positions) {
             val distanceSquared = fixedGeoPosition.distanceSquaredFrom(position)
-            if (distanceSquared < bestDistanceSquared || closestGeoPosition == null) {
-                bestDistanceSquared = distanceSquared
+            if (distanceSquared < maxDistanceSquared || closestGeoPosition == null) {
+                maxDistanceSquared = distanceSquared
                 closestGeoPosition = position
             }
         }

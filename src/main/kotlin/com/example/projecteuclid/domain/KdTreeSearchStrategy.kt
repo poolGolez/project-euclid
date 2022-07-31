@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
+import java.math.BigDecimal
 import javax.annotation.PostConstruct
 
 @Component
@@ -50,7 +51,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         var searchResult = searchTreeNode(fixedGeoPosition, tree.root!!, initialSearchResult)
 
         // backtrack
-        if (searchResult.distanceSquared != 0.0) {
+        if (searchResult.distanceSquared != BigDecimal.ZERO) {
             searchResult =
                 backTrackSearch(fixedGeoPosition, searchResult.leafNode!!.parent, searchResult)
         }
@@ -82,7 +83,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
             return newSearchResult.apply { leafNode = node }
         }
 
-        return if (node.compare(targetGeoPosition) > 0) {
+        return if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
             if (node.left != null) {
                 searchTreeNode(targetGeoPosition, node.left!!, newSearchResult)
             } else {
@@ -114,7 +115,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
 
         var newSearchResult = searchResult
         // search for closest point on opposite side of hyperplane if it exists
-        if (node.compare(targetGeoPosition) > 0) {
+        if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
             if (node.right != null) {
                 newSearchResult = searchTreeNode(targetGeoPosition, node.right!!, searchResult)
             }
@@ -142,11 +143,11 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
 
     data class SearchResult(
         val node: GeoPositionTree.TreeNode,
-        val distanceSquared: Double,
+        val distanceSquared: BigDecimal,
         var leafNode: GeoPositionTree.TreeNode?
     ) {
 
-        constructor(node: GeoPositionTree.TreeNode, distanceSquared: Double) : this(node, distanceSquared, null)
+        constructor(node: GeoPositionTree.TreeNode, distanceSquared: BigDecimal) : this(node, distanceSquared, null)
 
         val geoPosition: GeoPosition
             get() = node.position

@@ -1,15 +1,20 @@
 package com.example.projecteuclid.domain
 
-class GeoPosition(id: Long?, latitude: Double, longitude: Double) {
+import java.math.BigDecimal
+
+class GeoPosition(id: Long?, latitude: BigDecimal, longitude: BigDecimal) {
+
     val id = id;
     val latitude = latitude;
     val longitude = longitude;
 
-    constructor(latitude: Double, longitude: Double) : this(null, latitude, longitude)
+    constructor(latitude: BigDecimal, longitude: BigDecimal) : this(null, latitude, longitude)
 
-    fun distanceSquaredFrom(position: GeoPosition): Double {
-        return Math.pow(latitude - position.latitude, 2.0) +
-                Math.pow(longitude - position.longitude, 2.0)
+    constructor(latitude: Double, longitude: Double) : this(null, latitude.toBigDecimal(), longitude.toBigDecimal())
+
+    fun distanceSquaredFrom(position: GeoPosition): BigDecimal {
+        return (latitude - position.latitude).pow(2) +
+                (longitude - position.longitude).pow(2)
     }
 
     fun compareLatitude(other: GeoPosition) = latitude - other.latitude

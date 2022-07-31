@@ -1,7 +1,7 @@
 package com.example.projecteuclid.domain
 
+import java.math.BigDecimal
 import kotlin.math.max
-import kotlin.math.pow
 
 class GeoPositionTree(var root: TreeNode?) {
 
@@ -19,7 +19,7 @@ class GeoPositionTree(var root: TreeNode?) {
     }
 
     private fun insert(position: GeoPosition, parentNode: TreeNode) {
-        if (parentNode.compare(position) > 0) {
+        if (parentNode.compare(position) > BigDecimal.ZERO) {
             if (parentNode.left == null) {
                 parentNode.left = TreeNode(position, parentNode)
             } else {
@@ -60,7 +60,7 @@ class GeoPositionTree(var root: TreeNode?) {
                 return if (parent == null) 1 else parent!!.level + 1
             }
 
-        fun compare(other: GeoPosition): Double {
+        fun compare(other: GeoPosition): BigDecimal {
             return if (level % 2 == 1) {
                 position.compareLatitude(other)
             } else {
@@ -68,8 +68,8 @@ class GeoPositionTree(var root: TreeNode?) {
             }
         }
 
-        fun calculateHyperPlaneDistance(other: GeoPosition): Double {
-            return compare(other).pow(2.0)
+        fun calculateHyperPlaneDistance(other: GeoPosition): BigDecimal {
+            return compare(other).pow(2)
         }
 
         override fun toString(): String {
