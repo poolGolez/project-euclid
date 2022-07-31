@@ -51,7 +51,7 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         var searchResult = searchTreeNode(fixedGeoPosition, tree.root!!, initialSearchResult)
 
         // backtrack
-        if (searchResult.distanceSquared != BigDecimal.ZERO) {
+        if (searchResult.distanceSquared.compareTo(BigDecimal.ZERO) != 0) {
             searchResult =
                 backTrackSearch(fixedGeoPosition, searchResult.leafNode!!.parent, searchResult)
         }
@@ -73,9 +73,8 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
     ): SearchResult {
         val newSearchResult = updateSearchResult(searchResult, targetGeoPosition, node)
 
-        if (node.position.latitude == targetGeoPosition.latitude &&
-            node.position.longitude == targetGeoPosition.longitude
-        ) {
+        val nodeAndTargetTheSame = node.position.distanceSquaredFrom(targetGeoPosition).compareTo(BigDecimal.ZERO) == 0
+        if (nodeAndTargetTheSame) {
             return newSearchResult
         }
 
