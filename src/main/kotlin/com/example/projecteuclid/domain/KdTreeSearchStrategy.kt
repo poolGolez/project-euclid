@@ -26,16 +26,6 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
     @PostConstruct
     fun initKdTree() {
         logger.info("Initializing kd-tree...")
-
-//        val points = listOf(
-//            GeoPosition(8.0, 1.0),
-//            GeoPosition(0.0, 8.0),
-//            GeoPosition(16.0, 8.0),
-//            GeoPosition(4.0, 16.0),
-//            GeoPosition(12.0, 4.0),
-//            GeoPosition(5.0, 12.0),
-//            GeoPosition(7.0, 9.0),
-//        )
         val points = repository.findAll()
         geoPositionTree = treeBuilder.build(points)
         logger.info("Initialized kd-tree")
