@@ -1,18 +1,47 @@
 package com.example.projecteuclid.domain
 
+import com.example.projecteuclid.repository.GeoPositionRepository
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
+import javax.annotation.PostConstruct
 
 @Component
 @Qualifier("k-d tree search")
 class KdTreeSearchStrategy : GeoPositionSearchStrategy {
 
     @Autowired
-    lateinit var treeBuilder: GeoPositionTreeBuilder
+    private lateinit var treeBuilder: GeoPositionTreeBuilder
+
+    @Autowired
+    private lateinit var repository: GeoPositionRepository
+
+    private lateinit var geoPositionTree: GeoPositionTree
+
+    private val logger: Logger = LoggerFactory.getLogger(this.javaClass)
+
+    @PostConstruct
+    fun initKdTree() {
+        logger.info("Initializing kd-tree...")
+
+//        val points = listOf(
+//            GeoPosition(8.0, 1.0),
+//            GeoPosition(0.0, 8.0),
+//            GeoPosition(16.0, 8.0),
+//            GeoPosition(4.0, 16.0),
+//            GeoPosition(12.0, 4.0),
+//            GeoPosition(5.0, 12.0),
+//            GeoPosition(7.0, 9.0),
+//        )
+        val points = repository.findAll()
+        geoPositionTree = treeBuilder.build(points)
+        logger.info("Initialized kd-tree")
+    }
 
     override fun search(fixedGeoPosition: GeoPosition): GeoPosition? {
-        val tree = generateKdTree()
+        val tree = geoPositionTree
         if (tree.root == null) {
             return null
         }
@@ -109,20 +138,6 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
             SearchResult(node, nodeDistance, searchResult.leafNode)
         else
             SearchResult(searchResult.node, searchResult.distanceSquared, searchResult.leafNode)
-    }
-
-    private fun generateKdTree(): GeoPositionTree {
-        val points = listOf(
-            GeoPosition(8.0, 1.0),
-            GeoPosition(0.0, 8.0),
-            GeoPosition(16.0, 8.0),
-            GeoPosition(4.0, 16.0),
-            GeoPosition(12.0, 4.0),
-            GeoPosition(5.0, 12.0),
-            GeoPosition(7.0, 9.0)
-        )
-
-        return treeBuilder.build(points)
     }
 
     data class SearchResult(

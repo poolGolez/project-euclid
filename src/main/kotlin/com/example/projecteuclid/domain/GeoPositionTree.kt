@@ -1,10 +1,13 @@
 package com.example.projecteuclid.domain
 
+import kotlin.math.max
 import kotlin.math.pow
 
 class GeoPositionTree(var root: TreeNode?) {
 
     constructor() : this(null)
+
+    val height = root?.height ?: 0
 
     fun insert(position: GeoPosition) {
         if (root == null) {
@@ -47,6 +50,11 @@ class GeoPositionTree(var root: TreeNode?) {
         val isLeaf: Boolean
             get() = (left == null && right == null)
 
+        val height: Int
+            get() {
+                return max(left?.height ?: 0, right?.height ?: 0) + 1
+            }
+
         private val level: Int
             get() {
                 return if (parent == null) 1 else parent!!.level + 1
@@ -60,7 +68,7 @@ class GeoPositionTree(var root: TreeNode?) {
             }
         }
 
-        fun calculateHyperPlaneDistance(other : GeoPosition): Double {
+        fun calculateHyperPlaneDistance(other: GeoPosition): Double {
             return compare(other).pow(2.0)
         }
 
