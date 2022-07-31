@@ -14,7 +14,7 @@ class ClosestGeoPositionService {
     @Autowired
     @Qualifier("k-d tree search")
 //    @Qualifier("brute force search")
-    lateinit var strategy: GeoPositionSearchStrategy
+    private lateinit var strategy: GeoPositionSearchStrategy
 
     fun findClosest(position: GeoPosition): GeoPosition? {
         val closestPosition = strategy.search(position)

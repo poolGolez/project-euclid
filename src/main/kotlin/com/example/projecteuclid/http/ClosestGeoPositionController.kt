@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController
 class ClosestGeoPositionController {
 
     @Autowired
-    lateinit var service: ClosestGeoPositionService
+    private lateinit var service: ClosestGeoPositionService
 
     @GetMapping
     fun findClosestPosition(@RequestParam latitude: Double, @RequestParam longitude: Double): GeoPosition? {
