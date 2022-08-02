@@ -67,9 +67,17 @@ class GeoPositionTree(var root: TreeNode?) {
                 position.compareLongitude(other)
             }
         }
+        fun inverseCompare(other: GeoPosition): BigDecimal {
+            return if (level % 2 == 0) {
+                position.compareLatitude(other)
+            } else {
+                position.compareLongitude(other)
+            }
+        }
 
         fun calculateHyperPlaneDistance(other: GeoPosition): BigDecimal {
             return compare(other).pow(2)
+//            return inverseCompare(other).pow(2)
         }
 
         override fun toString(): String {
