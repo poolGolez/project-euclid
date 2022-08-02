@@ -36,22 +36,17 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
             return null
         }
 
-        val leafNode = searchHelper(fixedGeoPosition, geoPositionTree.root!!)
-
+        val leafNode = search(fixedGeoPosition, geoPositionTree.root!!)
         return leafNode.position
     }
 
-    private fun searchHelper(
-        target: GeoPosition,
-        startNode: GeoPositionTree.TreeNode
-    ): GeoPositionTree.TreeNode {
+    private fun search(target: GeoPosition, startNode: GeoPositionTree.TreeNode): GeoPositionTree.TreeNode {
         var leafNode = findLeafNode(target, startNode)
-
-        var searchResult = SearchResult(target, leafNode)
         if (startNode != leafNode) {
-            //backtrack only when there is a chain from leaf to start
+            val searchResult = SearchResult(target, leafNode)
             return backtrackSearch(startNode, leafNode.parent!!, target, searchResult).node
         }
+
         return leafNode
     }
 
@@ -65,24 +60,8 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
             return searchResult
         }
 
-        var newSearchResult = searchResult
-        val nodeDistance = node.position.distanceSquaredFrom(target)
-        if (nodeDistance < searchResult.distance) {
-            // search other subtree
-            newSearchResult = SearchResult(target, node)
-        }
-
-
-        val hyperPlaneDistance = node.calculateHyperPlaneDistance(target)
-        if (hyperPlaneDistance < newSearchResult.distance) {
-            var bestNodeFromOtherSide: GeoPositionTree.TreeNode? = searchOnOppositeSubTree(node, target)
-
-            if (bestNodeFromOtherSide != null &&
-                bestNodeFromOtherSide.position.distanceSquaredFrom(target) < newSearchResult.distance
-            ) {
-                newSearchResult = SearchResult(target, bestNodeFromOtherSide)
-            }
-        }
+        var newSearchResult = checkNodeDistance(node, target, searchResult)
+        newSearchResult = checkOtherSubTreeBestNode(node, target, newSearchResult)
 
         return if (startNode == node) {
             newSearchResult
@@ -91,22 +70,53 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
         }
     }
 
-    private fun searchOnOppositeSubTree(
+    private fun checkNodeDistance(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        searchResult: SearchResult
+    ): SearchResult {
+        val nodeDistance = node.position.distanceSquaredFrom(target)
+        if (nodeDistance < searchResult.distance) {
+            return SearchResult(target, node)
+        }
+        return searchResult
+    }
+
+    private fun checkOtherSubTreeBestNode(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        searchResult: SearchResult
+    ): SearchResult {
+        if (candidatePointsExistOnOtherSide(node, target, searchResult)) {
+            var bestNodeFromOtherSide: GeoPositionTree.TreeNode? = searchSubTreeOnOtherSide(node, target)
+            bestNodeFromOtherSide?.let {
+                if (bestNodeFromOtherSide.position.distanceSquaredFrom(target) < searchResult.distance) {
+                    return SearchResult(target, bestNodeFromOtherSide)
+                }
+            }
+        }
+        return searchResult
+    }
+
+    private fun candidatePointsExistOnOtherSide(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        newSearchResult: SearchResult
+    ): Boolean {
+        val hyperPlaneDistance = node.calculateHyperPlaneDistance(target)
+        return hyperPlaneDistance < newSearchResult.distance
+    }
+
+    private fun searchSubTreeOnOtherSide(
         node: GeoPositionTree.TreeNode,
         target: GeoPosition
     ): GeoPositionTree.TreeNode? {
         if (node.compare(target) > BigDecimal.ZERO && node.right != null) {
-            return searchHelper(target, node.right!!)
+            return search(target, node.right!!)
         } else if (node.compare(target) <= BigDecimal.ZERO && node.left != null) {
-            return searchHelper(target, node.left!!)
+            return search(target, node.left!!)
         }
         return null
-    }
-
-
-    data class SearchResult(val target: GeoPosition, val node: GeoPositionTree.TreeNode) {
-        val distance
-            get() = node.position.distanceSquaredFrom(target)
     }
 
     private fun findLeafNode(target: GeoPosition, node: GeoPositionTree.TreeNode): GeoPositionTree.TreeNode {
@@ -127,6 +137,11 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
                 findLeafNode(target, node.left!!)
             }
         }
+    }
+
+    data class SearchResult(val target: GeoPosition, val node: GeoPositionTree.TreeNode) {
+        val distance
+            get() = node.position.distanceSquaredFrom(target)
     }
 
 }
