@@ -32,113 +32,116 @@ class KdTreeSearchStrategy : GeoPositionSearchStrategy {
     }
 
     override fun search(fixedGeoPosition: GeoPosition): GeoPosition? {
-        val tree = geoPositionTree
-        if (tree.root == null) {
+        if (geoPositionTree.root == null) {
             return null
         }
 
-        val initialSearchResult = initSearchResult(tree)
-        var searchResult = searchClosestLeafNode(fixedGeoPosition, tree.root!!, initialSearchResult)
-
-        // backtrack
-        if (searchResult.distanceSquared.compareTo(BigDecimal.ZERO) != 0) {
-            searchResult =
-                backTrackSearch(fixedGeoPosition, searchResult.leafNode!!.parent, searchResult)
-        }
-        return searchResult.geoPosition
+        val leafNode = search(fixedGeoPosition, geoPositionTree.root!!)
+        return leafNode.position
     }
 
-    private fun initSearchResult(tree: GeoPositionTree): SearchResult {
-        val extremeLowerLeftValue = GeoPosition(-90.0, -180.0)
-        val extremeUpperRightValue = GeoPosition(90.0, 180.0)
-        val maxDistanceSquared = extremeLowerLeftValue.distanceSquaredFrom(extremeUpperRightValue)
+    private fun search(target: GeoPosition, startNode: GeoPositionTree.TreeNode): GeoPositionTree.TreeNode {
+        var leafNode = findLeafNode(target, startNode)
+        if (startNode != leafNode) {
+            val searchResult = SearchResult(target, leafNode)
+            return backtrackSearch(startNode, leafNode.parent!!, target, searchResult).node
+        }
 
-        return SearchResult(tree.root!!, maxDistanceSquared)
+        return leafNode
     }
 
-    private fun searchClosestLeafNode(
-        targetGeoPosition: GeoPosition,
-        node: GeoPositionTree.TreeNode,
-        searchResult: SearchResult
-    ): SearchResult {
-        val newSearchResult = updateSearchResult(searchResult, targetGeoPosition, node)
-
-        val nodeAndTargetTheSame = node.position.distanceSquaredFrom(targetGeoPosition).compareTo(BigDecimal.ZERO) == 0
-        if (nodeAndTargetTheSame) {
-            return newSearchResult
-        }
-
-        if (node.isLeaf) {
-            return newSearchResult.apply { leafNode = node }
-        }
-
-        return if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
-            if (node.left != null) {
-                searchClosestLeafNode(targetGeoPosition, node.left!!, newSearchResult)
-            } else {
-                searchClosestLeafNode(targetGeoPosition, node.right!!, newSearchResult)
-            }
-        } else {
-            if (node.right != null) {
-                searchClosestLeafNode(targetGeoPosition, node.right!!, newSearchResult)
-            } else {
-                searchClosestLeafNode(targetGeoPosition, node.left!!, newSearchResult)
-            }
-        }
-    }
-
-    private fun backTrackSearch(
-        targetGeoPosition: GeoPosition,
+    private fun backtrackSearch(
+        startNode: GeoPositionTree.TreeNode,
         node: GeoPositionTree.TreeNode?,
+        target: GeoPosition,
         searchResult: SearchResult
     ): SearchResult {
-        if (node == null) {
-            return SearchResult(searchResult.node, searchResult.distanceSquared)
+        if (node == null || searchResult.distance.compareTo(BigDecimal.ZERO) == 0) {
+            return searchResult
         }
 
-        val hyperPlaneIntersectsHyperSphere =
-            (node.calculateHyperPlaneDistance(targetGeoPosition) < searchResult.distanceSquared)
-        if (!hyperPlaneIntersectsHyperSphere) {
-            return backTrackSearch(targetGeoPosition, node.parent, searchResult)
+        var newSearchResult = checkNodeDistance(node, target, searchResult)
+        newSearchResult = checkOtherSubTreeBestNode(node, target, newSearchResult)
+
+        return if (startNode == node) {
+            newSearchResult
+        } else {
+            backtrackSearch(startNode, node.parent, target, newSearchResult)
+        }
+    }
+
+    private fun checkNodeDistance(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        searchResult: SearchResult
+    ): SearchResult {
+        val nodeDistance = node.position.distanceSquaredFrom(target)
+        if (nodeDistance < searchResult.distance) {
+            return SearchResult(target, node)
+        }
+        return searchResult
+    }
+
+    private fun checkOtherSubTreeBestNode(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        searchResult: SearchResult
+    ): SearchResult {
+        if (candidatePointsExistOnOtherSide(node, target, searchResult)) {
+            var bestNodeFromOtherSide: GeoPositionTree.TreeNode? = searchSubTreeOnOtherSide(node, target)
+            bestNodeFromOtherSide?.let {
+                if (bestNodeFromOtherSide.position.distanceSquaredFrom(target) < searchResult.distance) {
+                    return SearchResult(target, bestNodeFromOtherSide)
+                }
+            }
+        }
+        return searchResult
+    }
+
+    private fun candidatePointsExistOnOtherSide(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition,
+        newSearchResult: SearchResult
+    ): Boolean {
+        val hyperPlaneDistance = node.calculateHyperPlaneDistance(target)
+        return hyperPlaneDistance < newSearchResult.distance
+    }
+
+    private fun searchSubTreeOnOtherSide(
+        node: GeoPositionTree.TreeNode,
+        target: GeoPosition
+    ): GeoPositionTree.TreeNode? {
+        if (node.compare(target) > BigDecimal.ZERO && node.right != null) {
+            return search(target, node.right!!)
+        } else if (node.compare(target) <= BigDecimal.ZERO && node.left != null) {
+            return search(target, node.left!!)
+        }
+        return null
+    }
+
+    private fun findLeafNode(target: GeoPosition, node: GeoPositionTree.TreeNode): GeoPositionTree.TreeNode {
+        if (node.isLeaf) {
+            return node
         }
 
-        var newSearchResult = searchResult
-        // search for closest point on opposite side of hyperplane if it exists
-        if (node.compare(targetGeoPosition) > BigDecimal.ZERO) {
-            if (node.right != null) {
-                newSearchResult = searchClosestLeafNode(targetGeoPosition, node.right!!, searchResult)
+        return if (node.compare(target) > BigDecimal.ZERO) {
+            if (node.left != null) {
+                findLeafNode(target, node.left!!)
+            } else {
+                findLeafNode(target, node.right!!)
             }
         } else {
-            if (node.left != null) {
-                newSearchResult = searchClosestLeafNode(targetGeoPosition, node.left!!, searchResult)
+            if (node.right != null) {
+                findLeafNode(target, node.right!!)
+            } else {
+                findLeafNode(target, node.left!!)
             }
         }
-
-        return backTrackSearch(targetGeoPosition, node.parent, newSearchResult)
     }
 
-    private fun updateSearchResult(
-        searchResult: SearchResult,
-        targetGeoPosition: GeoPosition,
-        node: GeoPositionTree.TreeNode
-    ): SearchResult {
-        val bestDistance = searchResult.distanceSquared
-        val nodeDistance = node.position.distanceSquaredFrom(targetGeoPosition)
-        return if (nodeDistance < bestDistance)
-            SearchResult(node, nodeDistance, searchResult.leafNode)
-        else
-            SearchResult(searchResult.node, searchResult.distanceSquared, searchResult.leafNode)
+    data class SearchResult(val target: GeoPosition, val node: GeoPositionTree.TreeNode) {
+        val distance
+            get() = node.position.distanceSquaredFrom(target)
     }
 
-    data class SearchResult(
-        val node: GeoPositionTree.TreeNode,
-        val distanceSquared: BigDecimal,
-        var leafNode: GeoPositionTree.TreeNode?
-    ) {
-
-        constructor(node: GeoPositionTree.TreeNode, distanceSquared: BigDecimal) : this(node, distanceSquared, null)
-
-        val geoPosition: GeoPosition
-            get() = node.position
-    }
 }

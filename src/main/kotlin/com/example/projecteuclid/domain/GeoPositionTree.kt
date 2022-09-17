@@ -7,8 +7,6 @@ class GeoPositionTree(var root: TreeNode?) {
 
     constructor() : this(null)
 
-    val height = root?.height ?: 0
-
     fun insert(position: GeoPosition) {
         if (root == null) {
             root = TreeNode(position)
